@@ -1,8 +1,23 @@
-import type { WorkflowStep, StepStatus } from "../types/workflow"
+import type { WorkflowStep, StepState } from "../types/workflow";
 
 export function getReadySteps(
   steps: WorkflowStep[],
-  stepStatus: Record<string, StepStatus>
+  stepStatus: Record<string, StepState>,
 ): WorkflowStep[] {
-  throw new Error("TODO: implement getReadySteps")
+  const readySteps: WorkflowStep[] = [];
+  for (const step of steps) {
+    if (!step.dependsOn?.length) readySteps.push(step);
+    else {
+      const res = step.dependsOn.every((depend) => {
+        stepStatus[depend].status == "COMPLETED";
+      });
+
+      if (res) readySteps.push(step);
+    }
+  }
+
+  console.log("Ready steps: ", readySteps);
+
+  return readySteps;
 }
+

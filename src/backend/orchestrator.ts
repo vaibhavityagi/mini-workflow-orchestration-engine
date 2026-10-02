@@ -1,9 +1,15 @@
-import type { Workflow } from "../types/workflow"
-import { getWorkflow, setWorkflow } from "./workflow-store"
-import { getReadySteps } from "./dag"
-import { stepQueue } from "../queue/step-queue"
-import { resultQueue } from "../queue/result-queue"
-import { podManager } from "../pod-manager/pod-manager"
+import type {
+  QueuedStep,
+  StepResult,
+  Workflow,
+  WorkflowStep,
+} from "../types/workflow";
+import { getWorkflow, setWorkflow } from "./workflow-store";
+import { getReadySteps } from "./dag";
+import { stepQueue } from "../queue/step-queue";
+import { resultQueue } from "../queue/result-queue";
+import { podManager } from "../pod-manager/pod-manager";
+import { StepState, WorkflowState } from "../types/workflow";
 
 /**
  * TODO: Implement this class.
@@ -36,20 +42,121 @@ import { podManager } from "../pod-manager/pod-manager"
  * Pod manager only pushes events. Orchestrator reads events and updates state.
  */
 export class Orchestrator {
+  pushToStepQueue(readySteps: WorkflowStep[], workflow: WorkflowState) {
+    const workflowId = workflow.workflowId;
+
+    // update the status of ready steps to queued
+    readySteps.map((step) => {
+      workflow.stepState[step.id] = {
+        stepId: step.id,
+        status: "QUEUED",
+        podId: null,
+      };
+    });
+
+    setWorkflow(workflowId, workflow);
+
+    const stepsToQueue: QueuedStep[] = readySteps.map((step) => {
+      return {
+        stepId: step.id,
+        workflowId,
+        command: step.command,
+        enqueuedAt: Date.now(),
+      };
+    });
+
+    console.log("Step queue steps: ", stepsToQueue);
+
+    stepsToQueue.forEach((step) => stepQueue.enqueue(step));
+  }
+
+  updateWorkflowStore(step: StepResult) {
+    let workflow = getWorkflow(step.workflowId);
+
+    if (!workflow) return;
+
+    // update the status of each step
+    workflow.stepState[step.stepId] = {
+      ...workflow.stepState[step.stepId],
+      status: step.status,
+      podId: step.podId,
+    };
+
+    // update the status of the workflow
+    workflow = {
+      ...workflow,
+      status: "running",
+    };
+
+    setWorkflow(step.workflowId, workflow);
+
+    console.log(
+      "Workflow after consuming the result queue: ",
+      getWorkflow(step.workflowId),
+    );
+
+    const readySteps = getReadySteps(workflow.steps, workflow.stepState);
+
+    // workflow finished
+    if (readySteps.length == 0) {
+      const completedWorkflow: WorkflowState = {
+        ...workflow,
+        status: "completed",
+      };
+
+      setWorkflow(step.workflowId, completedWorkflow);
+    } else {
+      // push the new ready steps to the queue
+      this.pushToStepQueue(readySteps, workflow);
+    }
+  }
+
+  async consumeStepQueue() {
+    while (true) {
+      // pull from the step queue and give it to the pod manager
+      const step = await stepQueue.dequeue();
+      if (step) await podManager.dispatch(step);
+    }
+  }
+
   async submitWorkflow(workflow: Workflow): Promise<void> {
-    void workflow
-    void getWorkflow
-    void setWorkflow
-    void getReadySteps
-    void stepQueue
-    throw new Error("TODO: implement submitWorkflow")
+    // set workflow
+    const { workflowId, steps } = workflow;
+    const stepStates: Record<string, StepState> = {};
+
+    for (const step of steps) {
+      stepStates[step.id] = {
+        stepId: step.id,
+        status: "PENDING",
+        podId: null,
+      };
+    }
+
+    const state: WorkflowState = {
+      workflowId,
+      status: "pending",
+      steps,
+      stepState: stepStates,
+    };
+
+    setWorkflow(workflowId, state);
+
+    // find ready steps
+    const readySteps = getReadySteps(steps, stepStates);
+
+    // add the steps in the step queue
+    this.pushToStepQueue(readySteps, state);
+  }
+
+  async resultQueueHandler(result: StepResult) {
+    this.updateWorkflowStore(result);
   }
 
   async start(): Promise<void> {
-    void resultQueue
-    void podManager
-    throw new Error("TODO: implement start")
+    this.consumeStepQueue();
+    resultQueue.consume(this.resultQueueHandler);
   }
 }
 
-export const orchestrator = new Orchestrator()
+export const orchestrator = new Orchestrator();
+

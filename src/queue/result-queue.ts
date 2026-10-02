@@ -1,13 +1,14 @@
-import type { StepResult } from "../types/workflow"
-import { redis } from "./redis-client"
+import type { StepResult } from "../types/workflow";
+import { redis } from "./redis-client";
 
-const QUEUE_NAMESPACE = process.env.REDIS_QUEUE_PREFIX || `workflow:${process.pid}`
-const RESULT_QUEUE_KEY = `${QUEUE_NAMESPACE}:result-queue`
+const QUEUE_NAMESPACE =
+  process.env.REDIS_QUEUE_PREFIX || `workflow:${process.pid}`;
+const RESULT_QUEUE_KEY = `${QUEUE_NAMESPACE}:result-queue`;
 
-console.log(`📚 Result queue key: ${RESULT_QUEUE_KEY}`)
+console.log(`📚 Result queue key: ${RESULT_QUEUE_KEY}`);
 
 function parseStepResult(value: string): StepResult {
-  return JSON.parse(value) as StepResult
+  return JSON.parse(value) as StepResult;
 }
 
 /**
@@ -18,23 +19,23 @@ function parseStepResult(value: string): StepResult {
  */
 export class ResultQueue {
   async push(result: StepResult): Promise<void> {
-    await redis.lpush(RESULT_QUEUE_KEY, JSON.stringify(result))
+    await redis.lpush(RESULT_QUEUE_KEY, JSON.stringify(result));
   }
 
   async consume(handler: (result: StepResult) => Promise<void>): Promise<void> {
-    const subscriber = redis.duplicate()
+    const subscriber = redis.duplicate();
 
     while (true) {
-      const item = await subscriber.brpop(RESULT_QUEUE_KEY, 0)
-      if (!item) continue
+      const item = await subscriber.brpop(RESULT_QUEUE_KEY, 0);
+      if (!item) continue;
 
-      const [, value] = item
-      const result = parseStepResult(value)
+      const [, value] = item;
+      const result = parseStepResult(value);
 
-      // TODO: Students implement result handling in orchestrator.ts by passing a handler here.
-      await handler(result)
+      await handler(result);
     }
   }
 }
 
-export const resultQueue = new ResultQueue()
+export const resultQueue = new ResultQueue();
+
