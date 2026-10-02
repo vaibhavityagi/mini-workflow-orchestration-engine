@@ -1,6 +1,6 @@
-import type { QueuedStep } from "../types/workflow"
-import { podPool } from "../k8s/pod-pool"
-import { resultQueue } from "../queue/result-queue"
+import type { QueuedStep, StepResult } from "../types/workflow";
+import { podPool } from "../k8s/pod-pool";
+import { resultQueue } from "../queue/result-queue";
 
 /**
  * TODO: Implement this class.
@@ -23,12 +23,32 @@ import { resultQueue } from "../queue/result-queue"
  * It only pushes to the result queue.
  */
 export class PodManager {
+  async pushToResultQueue(
+    podId: string,
+    queStep: QueuedStep,
+    status: "RUNNING" | "COMPLETED" | "FAILED",
+  ) {
+    const step: StepResult = {
+      stepId: queStep.stepId,
+      workflowId: queStep.workflowId,
+      podId,
+      status,
+    };
+    await resultQueue.push(step);
+  }
+
   async dispatch(step: QueuedStep): Promise<void> {
-    void step
-    void podPool
-    void resultQueue
-    throw new Error("TODO: implement dispatch")
+    const pod = await podPool.acquirePod();
+
+    await this.pushToResultQueue(pod.podId, step, "RUNNING");
+
+    await podPool.execInPod(pod.podId, step.command);
+
+    await this.pushToResultQueue(pod.podId, step, "COMPLETED");
+
+    await podPool.releasePod(pod.podId);
   }
 }
 
-export const podManager = new PodManager()
+export const podManager = new PodManager();
+

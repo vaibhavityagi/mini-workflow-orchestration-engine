@@ -12,7 +12,7 @@ app.post("/workflow", async (req, res) => {
 
   try {
     orchestrator.submitWorkflow(workflow);
-    res.status(200).json({ message: "Ready steps enqueued" });
+    res.status(200).json({ workflowId: workflow.id, status: "accepted" });
   } catch (error) {
     res.status(500).json({ error });
   }
