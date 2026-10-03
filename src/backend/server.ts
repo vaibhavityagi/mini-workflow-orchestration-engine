@@ -1,6 +1,7 @@
 import express from "express";
 import { podPool } from "../k8s/pod-pool";
 import { orchestrator } from "./orchestrator";
+import { getWorkflow } from "./workflow-store";
 
 const app = express();
 app.use(express.json());
@@ -23,9 +24,9 @@ app.post("/workflow", async (req, res) => {
 app.get("/workflow/:id", (req, res) => {
   const workflowId = req.params.id;
 
-  // TODO: students implement this
-  void workflowId;
-  res.status(501).json({ error: "Not implemented" });
+  const workflow = getWorkflow(workflowId);
+
+  res.status(200).json({ workflow });
 });
 
 // GET /pods  — already implemented, useful for debugging

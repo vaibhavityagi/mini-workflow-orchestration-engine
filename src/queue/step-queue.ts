@@ -1,13 +1,14 @@
-import type { QueuedStep } from "../types/workflow"
-import { redis } from "./redis-client"
+import type { QueuedStep } from "../types/workflow";
+import { redis } from "./redis-client";
 
-const QUEUE_NAMESPACE = process.env.REDIS_QUEUE_PREFIX || `workflow:${process.pid}`
-const STEP_QUEUE_KEY = `${QUEUE_NAMESPACE}:step-queue`
+const QUEUE_NAMESPACE =
+  process.env.REDIS_QUEUE_PREFIX || `workflow:${process.pid}`;
+const STEP_QUEUE_KEY = `${QUEUE_NAMESPACE}:step-queue`;
 
-console.log(`📚 Step queue key: ${STEP_QUEUE_KEY}`)
+console.log(`📚 Step queue key: ${STEP_QUEUE_KEY}`);
 
 function parseQueuedStep(value: string): QueuedStep {
-  return JSON.parse(value) as QueuedStep
+  return JSON.parse(value) as QueuedStep;
 }
 
 /**
@@ -21,27 +22,29 @@ function parseQueuedStep(value: string): QueuedStep {
  */
 export class StepQueue {
   async enqueue(step: QueuedStep): Promise<void> {
-    await redis.lpush(STEP_QUEUE_KEY, JSON.stringify(step))
+    console.log("Inside step queue: ", step);
+    await redis.lpush(STEP_QUEUE_KEY, JSON.stringify(step));
   }
 
   async dequeue(): Promise<QueuedStep | null> {
-    const value = await redis.rpop(STEP_QUEUE_KEY)
-    if (!value) return null
+    const value = await redis.rpop(STEP_QUEUE_KEY);
+    if (!value) return null;
 
-    return parseQueuedStep(value)
+    return parseQueuedStep(value);
   }
 
   async peek(): Promise<QueuedStep | null> {
-    const values = await redis.lrange(STEP_QUEUE_KEY, -1, -1)
-    const value = values[0]
-    if (!value) return null
+    const values = await redis.lrange(STEP_QUEUE_KEY, -1, -1);
+    const value = values[0];
+    if (!value) return null;
 
-    return parseQueuedStep(value)
+    return parseQueuedStep(value);
   }
 
   async size(): Promise<number> {
-    return redis.llen(STEP_QUEUE_KEY)
+    return redis.llen(STEP_QUEUE_KEY);
   }
 }
 
-export const stepQueue = new StepQueue()
+export const stepQueue = new StepQueue();
+

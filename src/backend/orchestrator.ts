@@ -67,7 +67,7 @@ export class Orchestrator {
 
     console.log("Step queue steps: ", stepsToQueue);
 
-    stepsToQueue.forEach((step) => stepQueue.enqueue(step));
+    stepsToQueue.forEach(async (step) => await stepQueue.enqueue(step));
   }
 
   updateWorkflowStore(step: StepResult) {
@@ -154,7 +154,7 @@ export class Orchestrator {
 
   async start(): Promise<void> {
     this.consumeStepQueue();
-    resultQueue.consume(this.resultQueueHandler);
+    // resultQueue.consume(this.resultQueueHandler);
   }
 }
 
