@@ -27,12 +27,14 @@ export class PodManager {
     podId: string,
     queStep: QueuedStep,
     status: "RUNNING" | "COMPLETED" | "FAILED",
+    details: Pick<StepResult, "stdout" | "exitCode" | "error"> = {},
   ) {
     const step: StepResult = {
       stepId: queStep.stepId,
       workflowId: queStep.workflowId,
       podId,
       status,
+      ...details,
     };
     await resultQueue.push(step);
   }
@@ -40,15 +42,21 @@ export class PodManager {
   async dispatch(step: QueuedStep): Promise<void> {
     const pod = await podPool.acquirePod();
 
-    await this.pushToResultQueue(pod.podId, step, "RUNNING");
-
-    await podPool.execInPod(pod.podId, step.command);
-
-    await this.pushToResultQueue(pod.podId, step, "COMPLETED");
-
-    await podPool.releasePod(pod.podId);
+    try {
+      await this.pushToResultQueue(pod.podId, step, "RUNNING");
+      const stdout = await podPool.execInPod(pod.podId, step.command);
+      await this.pushToResultQueue(pod.podId, step, "COMPLETED", {
+        stdout,
+        exitCode: 0,
+      });
+    } catch (error) {
+      await this.pushToResultQueue(pod.podId, step, "FAILED", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      await podPool.releasePod(pod.podId);
+    }
   }
 }
 
 export const podManager = new PodManager();
-

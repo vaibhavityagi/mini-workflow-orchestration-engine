@@ -65,8 +65,6 @@ export class Orchestrator {
       };
     });
 
-    console.log("Step queue steps: ", stepsToQueue);
-
     stepsToQueue.forEach(async (step) => await stepQueue.enqueue(step));
   }
 
@@ -90,12 +88,11 @@ export class Orchestrator {
 
     setWorkflow(step.workflowId, workflow);
 
-    console.log(
-      "Workflow after consuming the result queue: ",
-      getWorkflow(step.workflowId),
-    );
-
     const readySteps = getReadySteps(workflow.steps, workflow.stepState);
+
+    // console.log("workflow: ", workflow);
+
+    console.log("ready steps from updateworkflowstore: ", readySteps);
 
     // workflow finished
     if (readySteps.length == 0) {
@@ -153,8 +150,10 @@ export class Orchestrator {
   }
 
   async start(): Promise<void> {
-    this.consumeStepQueue();
-    // resultQueue.consume(this.resultQueueHandler);
+    await Promise.all([
+      this.consumeStepQueue(),
+      resultQueue.consume((result) => this.resultQueueHandler(result)),
+    ]);
   }
 }
 
